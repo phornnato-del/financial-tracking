@@ -9,45 +9,111 @@ class SavingController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Saving::query();
-        
-        if ($request->has('category_id')) {
-            $query->where('category_id', $request->category_id);
+        try {
+            if (!$request->user()) {
+                return response()->json(['message' => 'Unauthorized - no user', 'error' => 'Please login first'], 401);
+            }
+
+            $savings = Saving::where('user_id', $request->user()->id)
+                ->with('savingCategory', 'user')
+                ->latest()
+                ->get();
+
+            return $savings;
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Saving index error', 'error' => $e->getMessage()], 500);
         }
-        return $query->get();
+    }
+
+    public function activeGoal(){
+        
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:0',
-            'category_id' => 'required|exists:categories,id',
-            'description' => 'nullable|string',
-        ]);
+        try {
+            if (!$request->user()) {
+                return response()->json(['message' => 'Unauthorized - no user', 'error' => 'Please login first'], 401);
+            }
 
-        return Saving::create($validated);
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:0',
+                'saving_category_id' => 'required|exists:saving_categories,id',
+            ]);
+
+            $saving = Saving::create([
+                'user_id' => $request->user()->id,
+                ...$validated,
+            ]);
+
+ 
+            $savingCategory = $saving->savingCategory;
+            $savingCategory->update([
+                'current_amount' => $savingCategory->current_amount + $validated['amount']
+            ]);
+
+            return $saving->load('savingCategory', 'user');
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Saving store error', 'error' => $e->getMessage()], 500);
+        }
     }
 
-    public function show(Saving $saving)
+    public function show(Request $request, Saving $saving)
     {
-        return $saving;
+        try {
+            if ($saving->user_id !== $request->user()->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            return $saving->load('savingCategory', 'user');
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Saving show error', 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function update(Request $request, Saving $saving)
     {
-        $validated = $request->validate([
-            'amount' => 'sometimes|numeric|min:0',
-            'category_id' => 'sometimes|exists:categories,id',
-            'description' => 'nullable|string',
-        ]);
+        try {
+            if ($saving->user_id !== $request->user()->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
 
-        $saving->update($validated);
-        return $saving  ;
+            $validated = $request->validate([
+                'amount' => 'sometimes|numeric|min:0',
+                'saving_category_id' => 'sometimes|exists:saving_categories,id',
+            ]);
+
+
+            if (isset($validated['amount']) && $validated['amount'] !== $saving->amount) {
+                $difference = $validated['amount'] - $saving->amount;
+                $saving->savingCategory->update([
+                    'current_amount' => $saving->savingCategory->current_amount + $difference
+                ]);
+            }
+
+            $saving->update($validated);
+            return $saving->load('savingCategory', 'user');
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Saving update error', 'error' => $e->getMessage()], 500);
+        }
     }
 
-    public function destroy(Saving $saving)
+    public function destroy(Request $request, Saving $saving)
     {
-        $saving->delete();
-        return response()->noContent();
+        try {
+            if ($saving->user_id !== $request->user()->id) {
+                return response()->json(['message' => 'Unauthorized'], 403);
+            }
+
+            // Subtract the amount from current_amount before deleting
+            $saving->savingCategory->update([
+                'current_amount' => $saving->savingCategory->current_amount - $saving->amount
+            ]);
+
+            $saving->delete();
+            return response()->noContent();
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Saving delete error', 'error' => $e->getMessage()], 500);
+        }
     }
 }

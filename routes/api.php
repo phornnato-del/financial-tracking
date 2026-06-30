@@ -8,47 +8,49 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\SavingController;
+use App\Http\Controllers\SavingCategoryController;
+use App\Http\Controllers\PurposeController;
 
-// Public Auth Routes
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
 Route::post('logout', [AuthController::class, 'logout']);
 
-// Public Categories (Read-only)
 Route::get('categories/expense', [CategoryController::class, 'expenseCategory']);
 Route::get('categories/income', [CategoryController::class, 'incomeCategory']);
 Route::get('categories/saving', [CategoryController::class, 'savingCategory']);
 Route::get('categories', [CategoryController::class, 'index']);
 Route::get('categories/{category}', [CategoryController::class, 'show']);
 
-// Protected Routes (require authentication)
+Route::get('purposes', [PurposeController::class, 'index']);
+Route::get('purposes/{purpose}', [PurposeController::class, 'show']);
+
 Route::middleware('token.auth')->group(function () {
+
+    Route::post('purposes', [PurposeController::class, 'store']);
+    Route::get('active-goals', [PurposeController::class, 'activeGoal']);
+    Route::put('purposes/{purpose}', [PurposeController::class, 'update']);
+    Route::delete('purposes/{purpose}', [PurposeController::class, 'destroy']);
     Route::get('profile', [AuthController::class, 'profile']);
     Route::put('profile', [AuthController::class, 'updateProfile']);
 
     Route::apiResource('savings', SavingController::class);
 
-    // Categories (Create, Update, Delete - Protected)
+    Route::apiResource('saving-categories', SavingCategoryController::class);
+
     Route::post('categories', [CategoryController::class, 'store']);
     Route::put('categories/{category}', [CategoryController::class, 'update']);
     Route::delete('categories/{category}', [CategoryController::class, 'destroy']);
 
-    // Incomes (Protected per user)
     Route::apiResource('incomes', IncomeController::class);
 
-    // Expenses (Protected per user)
     Route::apiResource('expenses', ExpenseController::class);
 
-    // Reports (Protected per user)
     Route::get('reports/daily', [ReportController::class, 'daily']);
     Route::get('reports/weekly', [ReportController::class, 'weekly']);
     Route::get('reports/monthly', [ReportController::class, 'monthly']);
 
-
-
 });
 
-// Deployment Helper - Run migrations
 Route::post('migrate', function () {
     if (env('APP_ENV') !== 'production') {
         return response()->json(['message' => 'Migrations only available in production'], 403);
