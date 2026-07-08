@@ -26,7 +26,7 @@ class SavingController extends Controller
     }
 
     public function activeGoal(){
-        
+
     }
 
     public function store(Request $request)
@@ -46,7 +46,7 @@ class SavingController extends Controller
                 ...$validated,
             ]);
 
- 
+
             $savingCategory = $saving->savingCategory;
             $savingCategory->update([
                 'current_amount' => $savingCategory->current_amount + $validated['amount']
