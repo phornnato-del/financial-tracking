@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Saving extends Model
 {
    protected $table = 'saving';
+
     protected $fillable = [
          'amount',
          'saving_category_id',
