@@ -97,6 +97,67 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out'], 200);
     }
 
+    public function firebaseLogin(Request $request)
+    {
+        try {
+            $idToken = $request->input('idToken');
+
+            if (!$idToken) {
+                return response()->json(['message' => 'Missing idToken'], 400);
+            }
+
+            // Decode the JWT token (basic decode without verification for now)
+            $tokenParts = explode('.', $idToken);
+            if (count($tokenParts) !== 3) {
+                return response()->json(['message' => 'Invalid token format'], 400);
+            }
+
+            // Decode the payload
+            $payload = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $tokenParts[1])), true);
+            
+            if (!$payload || !isset($payload['email'])) {
+                return response()->json(['message' => 'Invalid token payload'], 400);
+            }
+
+            $email = $payload['email'];
+            $name = $payload['name'] ?? explode('@', $email)[0];
+            $firebaseUid = $payload['user_id'] ?? null;
+
+            // Find or create user
+            $user = User::where('email', $email)->first();
+            
+            if (!$user) {
+                // Create new user with Firebase auth
+                $token = Str::random(60);
+                $user = User::create([
+                    'name' => $name,
+                    'email' => $email,
+                    'password' => Hash::make(Str::random(32)), // Random password for Firebase users
+                    'token' => $token,
+                ]);
+            } else {
+                // Generate new token for existing user
+                $token = Str::random(60);
+                $user->update(['token' => $token]);
+            }
+
+            return response()->json([
+                'message' => 'Logged in successfully',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+                'token' => $token,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Firebase login error',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function profile(Request $request)
     {
         return response()->json(['message' => 'OK'], 200);
